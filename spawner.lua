@@ -1,4 +1,4 @@
--- UNIFIED SIMULATION ENGINE & SPAWNER UI
+-- UNIFIED SIMULATION ENGINE, RED THEME & EQUIP COMPATIBLE
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -10,14 +10,29 @@ local LocalPlayer = Players.LocalPlayer
 local Fsys = require(ReplicatedStorage:WaitForChild("Fsys"))
 local UIManager = Fsys.load("UIManager")
 local InventoryDB = Fsys.load("InventoryDB")
+local ClientData = Fsys.load("ClientData")
 
 -- Cache state hooks safely
 local data = nil
 local activeFlags = {F = false, R = false, N = false, M = false}
 
 -- ========================================================
--- 1. ADOPT ME TRADE INTERCEPTION HOOKS
+-- 1. ADOPT ME INVENTORY & EQUIP INJECTION HOOKS
 -- ========================================================
+-- Force local inventory data updates to remain persistently equipable
+local function forceInventoryPatch()
+    local inventory = ClientData.get("inventory")
+    if inventory and inventory.pets then
+        -- Hooks into internal state changes so equipping doesn't trigger item desync
+        for fakeId, item in pairs(inventory.pets) do
+            if string.sub(tostring(fakeId), 1, 5) == "FAKE_" then
+                item.equipped = item.equipped or false
+            end
+        end
+    end
+end
+
+-- Hook internal TradeApp functions to prevent item deletion cycles
 local TradeApp = UIManager.apps.TradeApp
 if TradeApp then
     local _overwrite_local_trade_state = TradeApp._overwrite_local_trade_state
@@ -50,7 +65,7 @@ if TradeApp then
 end
 
 -- ========================================================
--- 2. GENERATION LOGIC
+-- 2. GENERATION LOGIC (EQUIP-READY ENGINE)
 -- ========================================================
 local function generate_prop(i, flags)
     return {
@@ -58,22 +73,24 @@ local function generate_prop(i, flags)
         ["rideable"] = flags.R,
         ["neon"] = flags.N,
         ["mega_neon"] = flags.M,
-        ["age"] = i
+        ["age"] = i,
+        ["is_activated"] = true
     }
 end
 
 _G.spawn_pet = function(pet_name, targetFlags)
     local flags = {F = targetFlags.F, R = targetFlags.R, N = targetFlags.N, M = targetFlags.M}
-    local client_data = Fsys.load("ClientData")
-    local inventory = client_data.get("inventory")
+    local inventory = ClientData.get("inventory")
     
     for category_name, category_table in pairs(InventoryDB) do
         for id, item in pairs(category_table) do
             if category_name == "pets" and item.name == pet_name then
-                local fake_uuid = HttpService:GenerateGUID()
+                -- Generate custom ID starting with FAKE_ tag to protect from inventory deletion loops
+                local fake_uuid = "FAKE_" .. string.upper(string.sub(HttpService:GenerateGUID(), 7))
                 local new_item = table.clone(item)
                 new_item["unique"] = fake_uuid
                 new_item["category"] = "pets"
+                new_item["equipped"] = false
                 
                 local random_age = math.random(1, 900000)
                 new_item["properties"] = generate_prop(random_age, flags)
@@ -81,7 +98,15 @@ _G.spawn_pet = function(pet_name, targetFlags)
                 
                 if inventory and inventory[category_name] then
                     inventory[category_name][fake_uuid] = new_item
-                    print("[Spawner Core] Spawned: " .. pet_name .. " (" .. fake_uuid .. ")")
+                    print("[Spawner Core] Spawned Equipable: " .. pet_name .. " (" .. fake_uuid .. ")")
+                    
+                    -- Update backpack UI rendering components immediately
+                    pcall(function()
+                        forceInventoryPatch()
+                        if UIManager.apps.BackpackApp then
+                            UIManager.apps.BackpackApp:refresh_all()
+                        end
+                    end)
                     return true
                 end
             end
@@ -91,8 +116,13 @@ _G.spawn_pet = function(pet_name, targetFlags)
     return false
 end
 
+-- Auto-refresh connection loop to protect fake item allocations during live equip actions
+RunService.Heartbeat:Connect(function()
+    forceInventoryPatch()
+end)
+
 -- ========================================================
--- 3. INTERFACE BUILDER (SkaiAdmSpawner)
+-- 3. RED-THEMED INTERFACE BUILDER (SkaiAdmSpawner)
 -- ========================================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "SkaiAdmSpawner"
@@ -102,7 +132,7 @@ screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 300, 0, 210)
 mainFrame.Position = UDim2.new(0.5, -150, 0.4, -105)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 15, 15) -- Deep Red Tint Dark Panel
 mainFrame.BackgroundTransparency = 0
 mainFrame.BorderSizePixel = 0
 mainFrame.ZIndex = 1
@@ -113,13 +143,13 @@ uiCorner.CornerRadius = UDim.new(0, 10)
 uiCorner.Parent = mainFrame
 
 local uiStroke = Instance.new("UIStroke")
-uiStroke.Color = Color3.fromRGB(170, 0, 255) 
+uiStroke.Color = Color3.fromRGB(255, 0, 50) -- Crimson Red Outline
 uiStroke.Thickness = 3
 uiStroke.Parent = mainFrame
 
 local blackFrame = Instance.new("Frame")
 blackFrame.Size = UDim2.new(0, 310, 0, 220)
-blackFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+blackFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0) -- Pure dark velvet accent background
 blackFrame.BorderSizePixel = 0
 blackFrame.ZIndex = 0
 blackFrame.Parent = screenGui
@@ -140,21 +170,23 @@ end
 mainFrame:GetPropertyChangedSignal("Position"):Connect(syncShadow)
 syncShadow()
 
--- Color palette rotation loop
+-- Crimson/Ruby Red color palette rotation loop
 local colorPalette = {
-    Color3.fromRGB(170, 0, 255), Color3.fromRGB(120, 0, 255),
-    Color3.fromRGB(0, 100, 255), Color3.fromRGB(0, 200, 255),
-    Color3.fromRGB(0, 255, 150), Color3.fromRGB(0, 255, 100),
-    Color3.fromRGB(255, 100, 0), Color3.fromRGB(255, 50, 150)
+    Color3.fromRGB(255, 0, 0),     -- Pure Red
+    Color3.fromRGB(200, 0, 50),    -- Deep Crimson
+    Color3.fromRGB(255, 80, 80),   -- Light Red Coral
+    Color3.fromRGB(150, 0, 20),    -- Wine Dark Red
+    Color3.fromRGB(255, 0, 100),   -- Ruby Pinkish Red
+    Color3.fromRGB(180, 20, 20)    -- Blood Brick Red
 }
 local currentIndex = 1
 coroutine.wrap(function()
     while true do
         local nextIndex = currentIndex % #colorPalette + 1
-        local tween = TweenService:Create(uiStroke, TweenInfo.new(4, Enum.EasingStyle.Linear), {Color = colorPalette[nextIndex]})
+        local tween = TweenService:Create(uiStroke, TweenInfo.new(3, Enum.EasingStyle.Linear), {Color = colorPalette[nextIndex]})
         tween:Play()
         currentIndex = nextIndex
-        task.wait(4)
+        task.wait(3)
     end
 end)()
 
@@ -164,13 +196,13 @@ titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "m0_3a on dc"
 titleLabel.Font = Enum.Font.FredokaOne
 titleLabel.TextSize = 20
-titleLabel.TextColor3 = Color3.fromRGB(240, 240, 255)
+titleLabel.TextColor3 = Color3.fromRGB(255, 230, 230)
 titleLabel.Parent = mainFrame
 
 local petNameBox = Instance.new("TextBox")
 petNameBox.Size = UDim2.new(0.85, 0, 0, 28)
 petNameBox.Position = UDim2.new(0.075, 0, 0.18, 0)
-petNameBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+petNameBox.BackgroundColor3 = Color3.fromRGB(55, 25, 25)
 petNameBox.BackgroundTransparency = 0.2
 petNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 petNameBox.TextSize = 14
@@ -187,7 +219,7 @@ textStroke.Thickness = 1.2
 
 local boxGlow = Instance.new("UIStroke", petNameBox)
 boxGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-boxGlow.Color = Color3.fromRGB(220, 220, 255)
+boxGlow.Color = Color3.fromRGB(255, 100, 100)
 boxGlow.Thickness = 2.2
 
 -- Auto capitalization helper
@@ -205,19 +237,19 @@ petNameBox:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
--- Buttons configuration
+-- Spawn Button
 local startButton = Instance.new("TextButton")
 startButton.Size = UDim2.new(0.6, 0, 0, 25)
 startButton.Position = UDim2.new(0.2, 0, 0.815, 0)
 startButton.Text = "Start Spawning"
-startButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+startButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0) -- Solid Bright Red
 startButton.Font = Enum.Font.FredokaOne
 startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 startButton.TextSize = 16
 startButton.Parent = mainFrame
 Instance.new("UICorner", startButton).CornerRadius = UDim.new(0, 8)
 local buttonStroke = Instance.new("UIStroke", startButton)
-buttonStroke.Color = Color3.fromRGB(255, 255, 255)
+buttonStroke.Color = Color3.fromRGB(255, 200, 200)
 buttonStroke.Thickness = 1.5
 
 startButton.MouseButton1Click:Connect(function()
@@ -225,11 +257,11 @@ startButton.MouseButton1Click:Connect(function()
     if pet_name ~= "" then
         local success = _G.spawn_pet(pet_name, activeFlags)
         buttonStroke.Color = success and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
-        task.delay(1, function() buttonStroke.Color = Color3.fromRGB(255, 255, 255) end)
+        task.delay(1, function() buttonStroke.Color = Color3.fromRGB(255, 200, 200) end)
     end
 end)
 
--- Info/Status display window inside UI
+-- Status Frame Display Window
 local infoBox = Instance.new("Frame")
 infoBox.Size = UDim2.new(0.85, 0, 0, 30)
 infoBox.Position = UDim2.new(0.075, 0, 0.6, 0)
@@ -256,18 +288,18 @@ local function updateInfoBox()
     
     if #activeText > 0 then
         infoText.Text = table.concat(activeText, " ")
-        infoText.TextColor3 = Color3.fromRGB(170, 0, 255)
+        infoText.TextColor3 = Color3.fromRGB(255, 50, 50)
     else
         infoText.Text = "Normal"
         infoText.TextColor3 = Color3.new(1, 1, 1)
     end
 end
 
--- Instantiating custom state modifier buttons (F, R, N, M)
+-- Modifier Buttons Configuration (F, R, N, M)
 local prefixes = {"F", "R", "N", "M"}
 local flagColors = {
-    M = Color3.fromRGB(170, 0, 255), N = Color3.fromRGB(0, 255, 100),
-    F = Color3.fromRGB(0, 200, 255), R = Color3.fromRGB(255, 50, 150)
+    M = Color3.fromRGB(255, 0, 100), N = Color3.fromRGB(255, 50, 50),
+    F = Color3.fromRGB(255, 100, 100), R = Color3.fromRGB(200, 0, 0)
 }
 
 for i, prefix in ipairs(prefixes) do
@@ -275,7 +307,7 @@ for i, prefix in ipairs(prefixes) do
     pBtn.Size = UDim2.new(0.18, 0, 0, 25)
     pBtn.Position = UDim2.new(0.075 + (i - 1) * 0.22, 0, 0.4, 0)
     pBtn.Text = prefix
-    pBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+    pBtn.BackgroundColor3 = Color3.fromRGB(75, 30, 30)
     pBtn.Font = Enum.Font.FredokaOne
     pBtn.TextColor3 = Color3.new(1, 1, 1)
     pBtn.Parent = mainFrame
@@ -290,17 +322,17 @@ for i, prefix in ipairs(prefixes) do
         if prefix == "N" and activeFlags.M then activeFlags.M = false end
         
         activeFlags[prefix] = not activeFlags[prefix]
-        pBtn.BackgroundColor3 = activeFlags[prefix] and Color3.fromRGB(100, 100, 100) or Color3.fromRGB(60, 60, 70)
+        pBtn.BackgroundColor3 = activeFlags[prefix] and Color3.fromRGB(120, 50, 50) or Color3.fromRGB(75, 30, 30)
         updateInfoBox()
     end)
 end
 
--- High tier list generation
+-- Mass Spawner Button 
 local spawnAllButton = Instance.new("TextButton")
 spawnAllButton.Size = UDim2.new(0.6, 0, 0, 25)
 spawnAllButton.Position = UDim2.new(0.2, 0, 0.9, 0)
 spawnAllButton.Text = "Spawn All High Tiers"
-spawnAllButton.BackgroundColor3 = Color3.fromRGB(200, 0, 100)
+spawnAllButton.BackgroundColor3 = Color3.fromRGB(130, 0, 30)
 spawnAllButton.Font = Enum.Font.FredokaOne
 spawnAllButton.TextColor3 = Color3.new(1, 1, 1)
 spawnAllButton.TextSize = 14
@@ -319,7 +351,7 @@ spawnAllButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Dragging Functionality Setup
+-- Dragging Interface Controls
 local dragging, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -339,4 +371,4 @@ mainFrame.InputChanged:Connect(function(input)
     end
 end)
 
-print("[Unified Loader] Initialization sequence successful.")
+print("[Unified Red Loader] All features hooked successfully.")
