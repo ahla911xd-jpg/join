@@ -32,8 +32,7 @@ local function showNotification()
 	-- Create Background Frame
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.new(0, 260, 0, 46)
-	-- Starts offscreen at the TOP center (X: 0.5 center, offset by half width -130. Y: -100 hides it above)
-	frame.Position = UDim2.new(0.5, -130, 0, -100) 
+	frame.Position = UDim2.new(0.5, -130, 0, -100) -- Starts offscreen at the top center
 	frame.BackgroundColor3 = Color3.fromRGB(35, 37, 41) 
 	frame.BorderSizePixel = 0
 	frame.Parent = screenGui
@@ -54,6 +53,13 @@ local function showNotification()
 	pfpCorner.CornerRadius = UDim.new(1, 0)
 	pfpCorner.Parent = pfp
 
+	-- Add the Blue Border (UIStroke)
+	local pfpStroke = Instance.new("UIStroke")
+	pfpStroke.Color = Color3.fromRGB(35, 85, 175) -- The blue color from your image
+	pfpStroke.Thickness = 2 -- Width of the border
+	pfpStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	pfpStroke.Parent = pfp
+
 	-- Create TextLabel
 	local textLabel = Instance.new("TextLabel")
 	textLabel.Size = UDim2.new(1, -55, 1, 0)
@@ -70,7 +76,7 @@ local function showNotification()
 	local tweenIn = TweenService:Create(
 		frame, 
 		TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), 
-		{Position = UDim2.new(0.5, -130, 0, 20)} -- Slides down to 20 pixels from the top
+		{Position = UDim2.new(0.5, -130, 0, 20)} 
 	)
 	tweenIn:Play()
 	
@@ -79,7 +85,7 @@ local function showNotification()
 		local tweenOut = TweenService:Create(
 			frame, 
 			TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In), 
-			{Position = UDim2.new(0.5, -130, 0, -100)} -- Slides back up offscreen
+			{Position = UDim2.new(0.5, -130, 0, -100)} 
 		)
 		tweenOut:Play()
 		tweenOut.Completed:Wait()
