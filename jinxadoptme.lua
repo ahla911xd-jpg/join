@@ -364,10 +364,10 @@ local carti69 = {
     SPAWN_FAKE_PLAYER_WITH_RANDOM_PET = false,
     FAKE_PLAYER_ACCEPT_TRADE_REQUEST = 2,
     CHAT_MESSAGES = {
-        'Tysm ! 💗💗', 'Thank you', 'Trusted TY ❤️', 'Can i play also', 'Can i spin this pet', 'Please respin 🥺',
-        'Spin again plss 😔', 'Please guys follow', 'Pls both ill cry 😢', 'My dp neon giraffe', 'My dp is bat dragon',
-        'Can i get mega pet', 'Change last 2 pets', 'Add or i will decline', 'Add more pets',
-        'You are under 😂', 'Do mega exotics',
+        'HIIII i joined from your bio', 'Tysm i followed you', 'broo thank you 😭❤️', 'MY FDREAM PET OMGGG', 'Its easier to join in bio', 'followed and shared ur live boss',
+        'THANKKKK YOUUU', 'Please guys follow', 'PLSSSS OMGG', 'My dp neon giraffe', 'My dp is bat dragon',
+        'Can i get mega pet', 'Change last 2 pets', 'GIVE ME MY DP PLSSSS I BEG', 'GUYS HES SO RICHHH OMG',
+        'OMG OMG OMGGG', 'PLEASEEEEE',
     },
     AUTO_CHAT_DELAY = 2,
     VERIFIED_FRIENDS = {
